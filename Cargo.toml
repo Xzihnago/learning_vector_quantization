@@ -1,0 +1,19 @@
+[package]
+name = "lvq"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.83"
+csv = "1.3.0"
+indicatif = "0.17.8"
+tch = "0.16.0"
+
+[build]
+target = "x86_64-pc-windows-msvc"
+
+[profile.release]
+panic = "abort"
+opt-level = "z"
