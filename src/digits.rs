@@ -1,49 +1,48 @@
 use anyhow::Result;
 use tch::{Device, Tensor};
 
-pub struct Digits {
+pub struct Dataset {
     pub target: Tensor,
     pub data: Tensor,
 }
 
-impl Digits {
+impl Dataset {
     pub fn train_data() -> Result<Self> {
-        let mut rdr = csv::Reader::from_path("data/train.csv")?;
+        let mut targets = Vec::new();
+        let mut datas = Vec::new();
 
-        let mut targets: Vec<i64> = Vec::new();
-        let mut datas: Vec<Vec<i64>> = Vec::new();
+        csv::Reader::from_path("data/train.csv")?
+            .records()
+            .filter_map(Result::ok)
+            .for_each(|record| {
+                if let Some((target, data)) = record
+                    .iter()
+                    .map(|s| s.parse().unwrap())
+                    .collect::<Vec<i64>>()
+                    .split_first()
+                {
+                    targets.push(*target);
+                    datas.push(data.to_vec())
+                }
+            });
 
-        for record in rdr.records().filter_map(|r| r.ok()) {
-            let v = record
-                .iter()
-                .map(|s| s.parse::<i64>().unwrap())
-                .collect::<Vec<_>>();
-
-            if let Some((target, data)) = v.split_first() {
-                datas.push(data.to_vec());
-                targets.push(*target);
-            }
-        }
-
-        Ok(Digits {
+        Ok(Self {
             target: Tensor::from_slice(&targets).to(Device::cuda_if_available()),
             data: Tensor::from_slice2(&datas).to(Device::cuda_if_available()),
         })
     }
 
     pub fn test_data() -> Result<Tensor> {
-        let mut rdr = csv::Reader::from_path("data/test.csv")?;
-
-        let mut datas: Vec<Vec<i64>> = Vec::new();
-
-        for record in rdr.records().filter_map(|r| r.ok()) {
-            let v = record
-                .iter()
-                .map(|s| s.parse::<i64>().unwrap())
-                .collect::<Vec<_>>();
-
-            datas.push(v);
-        }
+        let datas = csv::Reader::from_path("data/test.csv")?
+            .records()
+            .filter_map(Result::ok)
+            .map(|record| {
+                record
+                    .iter()
+                    .map(|s| s.parse().unwrap())
+                    .collect::<Vec<i64>>()
+            })
+            .collect::<Vec<_>>();
 
         Ok(Tensor::from_slice2(&datas).to(Device::cuda_if_available()))
     }
