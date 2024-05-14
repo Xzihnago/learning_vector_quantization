@@ -7,9 +7,8 @@ use crate::utils;
 pub struct LVQ {
     pub epochs: u8,
     pub learning_rate: f64,
-    pub w: Option<Tensor>,
-    pub labels: Option<Tensor>,
-    pub losses: Vec<f64>,
+    w: Option<Tensor>,
+    labels: Option<Tensor>,
 }
 
 impl LVQ {
@@ -19,7 +18,6 @@ impl LVQ {
             learning_rate,
             w: None,
             labels: None,
-            losses: Vec::new(),
         }
     }
 
@@ -34,22 +32,18 @@ impl LVQ {
         self.w = Some(w);
         self.labels = Some(labels);
 
-        let calc_avg_loss = |loss: i64, size: i64| loss as f64 / size as f64;
         for epoch in 1..=self.epochs {
             println!("Epoch {}/{}:", epoch, self.epochs);
             let pb = utils::progress_bar(size as u64);
 
-            let mut loss_sum = 0;
+            let mut loss_sum = 0.;
             for i in 0..size {
                 loss_sum += self.update_weight(&x.get(i), &y.get(i))?;
                 pb.set_position(i as u64);
-                pb.set_message(format!("loss: {:.4}", calc_avg_loss(loss_sum, i + 1)))
+                pb.set_message(format!("loss: {:.4}", loss_sum / (i + 1) as f64))
             }
+            pb.finish_with_message(format!("loss: {:.4}", loss_sum / size as f64));
 
-            let loss = calc_avg_loss(loss_sum, size);
-            pb.finish_with_message(format!("loss: {:.4}", loss));
-
-            self.losses.push(loss);
             self.learning_rate /= epoch as f64;
         }
 
@@ -62,6 +56,7 @@ impl LVQ {
         println!("Predicting...");
         let size = x.size()[0];
         let pb = utils::progress_bar(size as u64);
+
         for i in 0..size {
             pb.set_position(i as u64);
             res.push(self.predict_single(&x.get(i))?);
@@ -79,7 +74,7 @@ impl LVQ {
         }
     }
 
-    fn update_weight(&self, x: &Tensor, y: &Tensor) -> Result<i64> {
+    fn update_weight(&self, x: &Tensor, y: &Tensor) -> Result<f64> {
         let w_index = self.similar_w_index(x)?;
         let mut w = self.w.as_ref().unwrap().get(w_index);
 
@@ -90,10 +85,10 @@ impl LVQ {
         let _ = w.g_add_(&((x - &w) * learning_rate));
 
         let predict: i64 = self.predict_single(x)?.try_into()?;
-        let result: i64 = y.try_into()?;
-        match predict == result {
-            true => Ok(0),
-            false => Ok(1),
+        let target: i64 = y.try_into()?;
+        match predict == target {
+            true => Ok(0.),
+            false => Ok(1.),
         }
     }
 
